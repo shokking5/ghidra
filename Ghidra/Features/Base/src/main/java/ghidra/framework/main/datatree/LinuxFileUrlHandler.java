@@ -21,9 +21,18 @@ import java.awt.dnd.DropTargetDropEvent;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.file.Paths;
+
 
 import docking.widgets.tree.GTreeNode;
 import ghidra.app.services.FileImporterService;
@@ -79,11 +88,27 @@ public final class LinuxFileUrlHandler implements DataTreeFlavorHandler, FileOpe
 		}
 	}
 
+	public static String callCurlToDownloadFile(String url) throws IOException, URISyntaxException, InterruptedException {
+		String tempDir = System.getProperty("java.io.tmpdir");
+		String outputPath = tempDir + Paths.get(new URL(url).toURI().getPath()).getFileName().toString();
+
+		String command =
+				"curl --output " + outputPath + " " + url;
+		ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
+		Process process = processBuilder.start();
+		process.waitFor();
+
+		return outputPath;
+	}
+
 	private List<File> toFiles(Object transferData) {
 
 		return toUrls(transferData, s -> {
 			try {
-				return new File(new URL(s).toURI());
+				if (s.contains("http://") || s.contains("https://"))
+					return new File(callCurlToDownloadFile(s));
+				else
+					return new File(new URL(s).toURI());
 			}
 			catch (MalformedURLException e) {
 				// this could be the case that this handler is attempting to process an arbitrary
